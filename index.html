@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Webフォント -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+
+    <title>みんなで寄せ書き</title>
+</head>
+<body>
+    
+    <!-- コンテンツ表示画面ここから -->
+
+    <div id="main">
+        <p id="title">みんなで寄せ書き</p>
+        
+        <div id="send_area">
+            <input type="text" id="uname" placeholder="Name" required>
+            <br><br>
+            <textarea id="text" placeholder="Your Message" cols="30" rows="5" required></textarea>
+            <br><br>
+            <input type="password" id="deleteKey" placeholder="delete key（4桁まで）" maxlength="4" required>
+            <br><br>
+            <button id="send">Send</button>
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <!--/ コンテンツ表示画面ここまで -->
+
+    <!-- JQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+    <!--** Firebase **-->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getDatabase, ref, push, set, update, remove, onChildAdded, onChildChanged, onChildRemoved }  //ここに書いた関数だけが使える
+        from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+      
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+        };
+
+        // Initialize Firebase（決まった書き方）
+        const app = initializeApp(firebaseConfig); //firebaseに接続
+        const db = getDatabase(app); //リアルタイムデータベースに接続
+        const dbRef = ref(db,"chat"); //チャットを入れる場所"chat"を作る。dbRefは、リアルタイムデータベースの"chat"を監視するよ
+        
+        //メッセージを送信するとfirebaseに保存
+        $("#send").on("click",function(){
+            const msg = {
+                uname : $("#uname").val(),
+                text : $("#text").val(),
+                deleteKey : $("#deleteKey").val(),
+                timestamp: Date.now()
+            }
+            const newPostRef = push(dbRef); //push関数＝チャットに送るデータにユニークキーをつけたいので生成
+            set(newPostRef,msg); //ユニークキーとチャットに送るメッセージをfirebaseに送信
+            $("#text").val(''); //入力欄をクリア
+            $("#deleteKey").val(''); //入力欄をクリア
+        });
+
+        //リアルタイムにデータ表示
+        onChildAdded(dbRef,function(data){
+            const msg = data.val();
+
+            function formatDate(date){
+                const year = date.getFullYear();
+                const month = ('0'+(date.getMonth()+1)).slice(-2);
+                const day = ('0' + date.getDate()).slice(-2);
+                return `${year}-${month}-${day}`;
+            }
+            const formattedDate = formatDate(new Date(msg.timestamp));
+    
+            const key = data.key; //ユニークキーを取得する（削除・更新に必要！）
+            let h = '<div id="'+key+'" class="message">';
+                h += '<span contentEditable="true" id="'+key+'_update">'+msg.text+'</span>';
+                h += '<br>';
+                h += '<br>';
+                h += '<br>';
+                h += 'from ';
+                h += msg.uname;
+                h += '<br>';
+                h += '<span class="date">'+formattedDate+'</span>';
+                h += '<span class="remove" data-key="'+key+'" data-delete-key="'+msg.deleteKey+'">delete</span>';
+                h += '</div>';
+                $("#output").prepend(h);
+        });
+
+        // 削除ボタンを押すとFirebaseのデータ削除
+        $("#output").on("click",".remove",function(){
+            const key = $(this).attr("data-key");  // メッセージのユニークキーを取得
+            const deleteKey = String($(this).data("deleteKey")); // 削除キーを文字列として取得
+            console.log(deleteKey);
+            // 削除確認とキーの入力
+            const userInput = prompt("削除キーを入力してください:");
+            console.log(userInput);
+            if (userInput === deleteKey) {
+                // キーが正しい場合、メッセージを削除
+                const remove_item = ref(db,"chat/"+key); //削除する場所を指定
+                remove(remove_item); //Firebaseデータ削除関数
+            } else {
+                alert("削除キーが間違っています。");
+            }
+        });
+
+        //削除処理がFirebase側で実行されたら表示も削除
+        onChildRemoved(dbRef, (data) => {
+            $("#"+data.key).remove();
+        });
+
+
+
+
+</script>
+</body>
+</html>
